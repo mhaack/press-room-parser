@@ -3,26 +3,41 @@ const cheerio = require('cheerio');
 const createCsvWriter = require('csv-writer').createObjectCsvWriter;
 const { DateTime } = require('luxon');
 
+const pattern = /\[(.*?)\]$/;
+
 function formatDateToUSFormat(dateString) {
   return DateTime.fromFormat(dateString, 'MMMM d, yyyy').toISODate();
 }
 
+function titleDecompose(title) {
+  if (title?.indexOf('|') > 0) {
+    const parts = title.split('|');
+    return { title: parts[1].trim(), source: parts[0].trim() };
+  }
+
+  const match = title.match(pattern);
+  if (match) {
+    const source = match[0].replace('[', '').replace(']', '');
+    const realTitle = title.replace(pattern, '');
+    return { title: realTitle.trim(), source: source.trim() };
+  }
+
+  return { title, source: '' };
+}
+
+
 async function fetchData(url) {
-  console.log('Fetching data from:', url);
   const response = await axios.get(url);
   const $ = cheerio.load(response.data);
   const dataList = [];
 
   $('ul.press > li:not(.headline)').each((index, element) => {
-    let title = $(element).find('a').text().trim();
-    if (title?.indexOf('|') > 0) {
-      title = title.split('|')[1].trim();
-    }
+    let { title, source } = titleDecompose($(element).find('a').text().trim());
 
     const link = $(element).find('a').attr('href').trim().replace('#new_tab', '');
     const date = formatDateToUSFormat($(element).find('span.date').text().trim());
 
-    let source = $(element).find('a > strong').text().trim();
+    //let source = $(element).find('a > strong').text().trim();
     if (source === '') {
       source = $(element).find('span.source').text().trim();
     }
